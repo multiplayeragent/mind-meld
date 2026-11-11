@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mind Meld</title>
+<style>
+  :root { --bg: #171332; --ink: #fff; --dim: #b4acd9; --left: #3d8bff; --right: #ff7a45; --gold: #ffd166; --ok: #3ddc97; --card: #fffaf0; }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body { background: radial-gradient(900px 600px at 0% 0%, #2c2a6e, transparent 60%), radial-gradient(800px 600px at 100% 100%, #5a1f4a, transparent 60%), var(--bg);
+         color: var(--ink); font: 16px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+  [hidden] { display: none !important; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; max-width: 900px; margin: 0 auto;
+         padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  header { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+  header h1 { margin: 0; font-size: 21px; font-weight: 900; white-space: nowrap; }
+  header h1 span { color: var(--gold); }
+  #rn { margin-left: auto; font-weight: 800; color: var(--dim); white-space: nowrap; }
+  #score { font-weight: 900; color: var(--gold); white-space: nowrap; }
+  #name { width: 120px; height: 38px; border-radius: 10px; border: 1px solid #ffffff33; background: #ffffff14; color: #fff; padding: 0 10px; font: inherit; font-size: 16px; box-sizing: border-box; }
+  #bar { height: 8px; border-radius: 6px; background: #ffffff1a; overflow: hidden; flex: none; }
+  #bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--left), var(--gold), var(--right)); transform-origin: left; }
+  #clue { text-align: center; min-height: 60px; }
+  #clue small { display: block; color: var(--dim); font-weight: 800; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  #clue b { display: inline-block; margin-top: 4px; font-size: clamp(24px, 5vw, 40px); font-weight: 900; color: var(--ink); overflow-wrap: anywhere; }
+  #clue b.wait { font-size: clamp(18px, 3.6vw, 26px); color: var(--dim); }
+  #dialWrap { flex: 1; min-height: 160px; position: relative; }
+  #dial { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  #how { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+  #how div { background: #0c0a20d0; border-radius: 16px; padding: 14px 18px; max-width: min(460px, calc(100% - 32px)); box-sizing: border-box; font-weight: 700; }
+  #how p { margin: 6px 0; } #how p b { color: var(--gold); }
+  #act { display: flex; gap: 10px; justify-content: center; min-height: 54px; }
+  #act input { flex: 1; max-width: 420px; min-width: 0; height: 54px; border-radius: 14px; border: 3px solid #ffffff30; background: #ffffff12; color: #fff; padding: 0 14px; font: 800 18px system-ui, sans-serif; box-sizing: border-box; }
+  #act input:focus { outline: none; border-color: var(--gold); }
+  button.go { min-height: 54px; min-width: 120px; border: 0; border-radius: 14px; padding: 0 20px; font: 900 17px system-ui, sans-serif; cursor: pointer; background: var(--gold); color: #1b1640; box-shadow: 0 5px 0 #0006; }
+  button.go:active { transform: translateY(3px); box-shadow: 0 2px 0 #0006; }
+  button.go.done { background: var(--ok); }
+  #hint { text-align: center; color: var(--dim); font-weight: 700; min-height: 1.3em; font-size: 14px; }
+  #players { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .p { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: #ffffff14; font-weight: 700; font-size: 13px; position: relative; }
+  .p .av { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: #fff; font-weight: 900; }
+  .p.me { box-shadow: inset 0 0 0 2px var(--gold); }
+  .p.giver { background: #ffd16633; }
+  .p.in .av::after { content: "✓"; position: absolute; left: 20px; top: -3px; background: var(--ok); color: #053; border-radius: 50%; width: 15px; height: 15px; font-size: 10px; display: grid; place-items: center; }
+  #net { font-size: 12px; color: var(--dim); text-align: center; }
+  #over { position: fixed; inset: 0; display: grid; place-items: center; background: #0b0920b0; padding: 16px; z-index: 4; }
+  .card { width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box; background: var(--card); color: #1b1640; border-radius: 20px; padding: 18px; text-align: center; box-shadow: 0 20px 60px #0008; }
+  .card h2 { margin: 0 0 4px; font-size: 26px; } .card ol { text-align: left; padding-left: 26px; margin: 8px 0; font-size: 14px; } .card li span { float: right; }
+  .card h3 { margin: 10px 0 0; font-size: 12px; color: #6d6790; text-transform: uppercase; letter-spacing: .08em; }
+  #oSub, #oNext { color: #6d6790; font-size: 14px; font-weight: 700; }
+  @media (max-width: 560px) { header h1 { font-size: 18px; } #name { width: 96px; } #rn { display: none; } #score { margin-left: auto; } button.go { min-width: 96px; padding: 0 14px; } }
+</style>
+<script src="https://cdn.multiplayeragent.com/sdk/mp.global.js"></script>
+</head>
+<body>
+<div id="app">
+  <header><h1>Mind <span>Meld</span></h1><span id="rn"></span><span id="score"></span><input id="name" maxlength="14" placeholder="Your name" aria-label="Your name"></header>
+  <div id="bar"><i></i></div>
+  <div id="clue"></div>
+  <div id="dialWrap"><canvas id="dial"></canvas>
+    <div id="how" hidden><div>
+      <p><b>1.</b> One player sees where the secret target is between two opposites.</p>
+      <p><b>2.</b> They give a short clue: “cold … hot”? Say “soup”.</p>
+      <p><b>3.</b> Everyone turns the dial together. Closer = more team points.</p>
+    </div></div>
+  </div>
+  <form id="act"><input id="clueIn" maxlength="30" placeholder="Your clue (a word or two)" autocomplete="off" enterkeyhint="send" hidden><button class="go" id="go">Lock in</button></form>
+  <div id="hint"></div>
+  <div id="players"></div>
+  <div id="net">Connecting…</div>
+</div>
+<div id="over" hidden><div class="card">
+  <h2 id="oTitle"></h2><div id="oSub"></div><ol id="ranks"></ol>
+  <h3>Best team scores</h3><ol id="board10"><li>Loading the leaderboard…</li></ol>
+  <button class="go" id="again">Play again</button><div id="oNext"></div>
+</div></div>
+<script>
+/* ═══ MIND MELD · a Multiplayer Agent starter ════════════════════════════════════════════
+ * One clue, one dial, one team. How close can you get? Party, 2–10 players; bots fill seats.
+ *
+ * WHERE THINGS ARE (search for the "── " headers):
+ *   CONFIG ........ timers, scoring zones, seats, how the bots play
+ *   CARDS ......... the spectrum cards: two opposites, plus three example clues the bots use
+ *   CONNECTION .... MP_CONNECT, joining, the offline room, who is host
+ *   SEALED SECRETS  the Seal helper: the target is encrypted so only the clue-giver can read it
+ *   GAME (HOST) ... rounds (lobby, clue, guess, reveal, results), dealing the target, the dial,
+ *                   locking in, scoring, taking over as a new host
+ *   BOTS (HOST) ... bot clues, bots turning the dial and locking in
+ *   ME ............ giving my clue, turning the dial, locking in, opening my target
+ *   SCREEN ........ the dial, the clue, players, results, leaderboard, sounds and sparks
+ *
+ * HOW THE MULTIPLAYER WORKS (a relay room: no server code):
+ *   - The game lives in ONE shared field, `game`: {id, v, ph, n, deal, seed, order, giver, card,
+ *     at, endsAt, clue, target, final, pts, score, gave, bots, locked, ready}. Only the HOST
+ *     writes it (`v` goes up on every write). The host is the lowest sessionId among live
+ *     players (heartbeat seen in the last 3s). `order` is who gives the clue each round.
+ *   - The TARGET is hidden: the host picks it and seals it to the clue-giver's key in the
+ *     shared `secret` field, so only the clue-giver can open it (the host deals, so it knows
+ *     it too). It goes into `game.target` for everyone at the reveal. On a host change the
+ *     clue-giver re-sends it to the new host, sealed; if the giver was a bot (its target lived
+ *     in the old host's memory), the new host deals that round again.
+ *   - The DIAL is one shared field, `dial` = {k, x, by, v}, written by the host only. Players
+ *     send "turn" intents ({k, x}, ~12 a second while dragging); the host applies them.
+ *   - Each player writes its OWN entity: `n`, `c`, `hb`, `pk`, `clue` = {k, t} (when it is
+ *     the clue-giver) and `lk` = "r<round>" (locked in). Bots' locks live in game.locked.
+ *   - Timers are timestamps in `game` (endsAt); a new host carries on from them.
+ *   - Intents: "turn" (move the dial), "secret" (a target re-sent to a new host), "who"
+ *     (a new host asking for it), "ready" (Play again).
+ *   - ?attract plays offline with bots only (the preview video is recorded from it).
+ *   - Leaderboard "meld-points": the team's best total in one game.
+ */
+
+// ── CONFIG ──────────────────────────────────────────────────────────────────────────
+const CONFIG = {
+  seats: 4,               // bots fill the team up to this many players
+  maxRounds: 8,           // each player gives one clue per game, up to this many rounds
+  lobbyMs: 7000,          // countdown before a game
+  clueMs: 45000,          // time to think of a clue
+  guessMs: 45000,         // time to turn the dial
+  hurryMs: 900,           // once everyone has locked in, the reveal comes this much later
+  revealMs: 6000,         // the target shows this long
+  resultsMs: 16000,       // the results screen
+  graceMs: 2500,          // a new host waits this long for the target to be re-sent
+  leaveMs: 6000,          // a clue-giver silent this long gets a clue written for them
+  zones: [[4, 4], [11, 3], [18, 2]], // [how close, points]: within 4 = 4 points, within 11 = 3, within 18 = 2
+  turnEveryMs: 80,        // how often my drag is sent to the host (≈12 a second)
+  dialEveryMs: 66,        // how often the host writes the dial (≈15 a second)
+  botClueAt: [2500, 6000],  // when a bot gives its clue (ms into the round)
+  botNudgeMs: [450, 1100],  // how often some bot turns the dial
+  botStep: 7,             // the most a bot turns the dial in one go
+  botSpread: 7,           // how far a bot's guess strays when it understands the clue
+  botBlind: 15,           // …and when it doesn't (a person's clue)
+  board: "meld-points",   // leaderboard name
+};
+const BOT_NAMES = ["Psy", "Hunch", "Vibes", "Echo", "Glimmer", "Nova", "Mystic", "Ponder", "Zen", "Oracle"];
+const FRIENDLY = ["Sunny", "Pip", "Biscuit", "Maple", "Pickle", "Wren", "Taco", "Juniper", "Clover", "Basil"];
+const COLORS = ["#ff5277", "#3d8bff", "#3ddc97", "#ff9f1c", "#b07cff", "#00c2c7", "#f15bb5", "#c9d34a", "#ff7a45", "#7c8cff"];
+
+// ── CARDS ───────────────────────────────────────────────────────────────────────────
+// [left, right, example near the left, example in the middle, example near the right].
+// The examples are bot clues; people make their own.
+const CARDS = [
+  ["Cold", "Hot", "ice cube", "room temperature", "lava"], ["Quiet", "Loud", "whisper", "chatting", "jet engine"],
+  ["Small", "Huge", "ant", "dog", "whale"], ["Boring", "Exciting", "tax forms", "a walk", "roller coaster"],
+  ["Cheap", "Expensive", "gum", "nice dinner", "private jet"], ["Soft", "Hard", "pillow", "cheese", "diamond"],
+  ["Slow", "Fast", "snail", "bicycle", "rocket"], ["Ugly", "Beautiful", "a toad", "a mailbox", "a sunset"],
+  ["Smells bad", "Smells good", "wet dog", "pencil", "fresh bread"], ["Easy to do", "Hard to do", "tying shoes", "juggling", "brain surgery"],
+  ["Safe", "Dangerous", "pillow fort", "skateboarding", "shark tank"], ["Rare", "Common", "four-leaf clover", "red car", "pigeons"],
+  ["Sad", "Happy", "a funeral", "a Tuesday", "birthday party"], ["Bad pet", "Good pet", "shark", "snake", "golden retriever"],
+  ["Old", "New", "pyramids", "grandma's car", "today's news"], ["Healthy", "Unhealthy", "broccoli", "sandwich", "fried butter"],
+  ["Wet", "Dry", "ocean", "damp towel", "desert"], ["Light", "Heavy", "feather", "backpack", "piano"],
+  ["Normal", "Weird", "a spoon", "socks with sandals", "talking toaster"], ["Villain", "Hero", "evil wizard", "tax collector", "firefighter"],
+  ["Mild", "Spicy", "milk", "salsa", "ghost pepper"], ["Short time", "Long time", "a blink", "a movie", "a century"],
+  ["Messy", "Tidy", "toddler's room", "office desk", "museum"], ["Cute", "Scary", "kitten", "goose", "haunted house"],
+  ["Bad idea", "Good idea", "juggling knives", "cake for breakfast", "seatbelt"], ["Dark", "Bright", "cave", "cloudy day", "the sun"],
+  ["Ancient", "Modern", "stone tools", "typewriter", "smartphone"], ["Simple", "Complicated", "paperclip", "bicycle", "space station"],
+  ["Polite", "Rude", "saying thanks", "late reply", "cutting the line"], ["Fragile", "Sturdy", "soap bubble", "mug", "brick wall"],
+  ["Calm", "Chaotic", "library", "school hallway", "toddler party"], ["Lazy", "Hardworking", "house cat", "weekend gardener", "ant colony"],
+  ["Indoors", "Outdoors", "sofa", "balcony", "mountain top"], ["Sweet", "Sour", "cotton candy", "orange", "lemon"],
+  ["Smooth", "Rough", "glass", "wood", "sandpaper"], ["Silly", "Serious", "clown", "teacher", "judge"],
+  ["Bad movie snack", "Good movie snack", "raw onion", "celery", "popcorn"], ["Easy to spell", "Hard to spell", "cat", "banana", "onomatopoeia"],
+  ["Plain", "Fancy", "toast", "pasta dinner", "wedding cake"], ["Forgettable", "Unforgettable", "Tuesday lunch", "a birthday", "moon landing"],
+  ["Waste of time", "Worth it", "waiting in line", "a long walk", "learning to swim"], ["Tiny problem", "Huge problem", "hangnail", "flat tire", "asteroid"],
+  ["Clean", "Dirty", "new towel", "park bench", "muddy pig"], ["Unpopular", "Popular", "sprouts", "jazz", "pizza"],
+  ["Weak", "Strong", "wet noodle", "average person", "gorilla"], ["Short", "Tall", "mouse", "person", "skyscraper"],
+  ["Bad gift", "Great gift", "used tissue", "a mug", "a puppy"], ["Unlucky", "Lucky", "broken mirror", "coin toss", "lottery win"],
+  ["Cold food", "Hot food", "ice cream", "sandwich", "soup"], ["Kids' thing", "Grown-up thing", "sandbox", "video games", "paying taxes"],
+  ["Nature", "Technology", "a tree", "a bicycle", "a robot"], ["Peaceful", "Stressful", "hammock", "grocery shopping", "defusing a bomb"],
+  ["Cheap to own", "Costly to own", "goldfish", "a car", "a yacht"], ["Quiet animal", "Loud animal", "giraffe", "dog", "howler monkey"],
+  ["Gross", "Delicious", "sock soup", "school lunch", "chocolate cake"], ["Uncool", "Cool", "fanny pack", "backpack", "leather jacket"],
+  ["Low", "High", "basement", "bridge", "airplane"], ["Shallow", "Deep", "puddle", "swimming pool", "ocean floor"],
+  ["Thin", "Thick", "paper", "sandwich", "dictionary"], ["Straight", "Curvy", "ruler", "country road", "roller coaster"],
+  ["Normal topping", "Weird topping", "cheese", "pineapple", "gummy bears"], ["Need", "Want", "water", "a phone", "gold toilet"],
+  ["Morning thing", "Night thing", "breakfast", "lunch", "stargazing"], ["Summer", "Winter", "ice cream truck", "falling leaves", "snowman"],
+  ["Science", "Magic", "microscope", "rainbow", "magic wand"], ["Short-lived", "Long-lived", "mayfly", "dog", "tortoise"],
+  ["Natural", "Artificial", "river", "bread", "plastic"], ["Bad habit", "Good habit", "nail biting", "coffee", "brushing teeth"],
+  ["Cozy", "Uncomfortable", "blanket fort", "office chair", "bed of nails"], ["Snack", "Meal", "a grape", "sandwich", "a feast"],
+  ["Round", "Pointy", "ball", "egg", "needle"], ["Dim animal", "Smart animal", "jellyfish", "chicken", "dolphin"],
+  ["Calm weather", "Wild weather", "sunny day", "thunderstorm", "hurricane"], ["Sleepy", "Energetic", "sloth", "a dog walk", "hummingbird"],
+  ["Low tech", "High tech", "pencil", "microwave", "spaceship"], ["Wild", "Tame", "wolf", "farm goat", "house cat"],
+  ["Hidden", "Obvious", "needle in a haystack", "street sign", "elephant in a room"], ["Alone time", "Party time", "reading", "dinner party", "karaoke"],
+  ["Basic", "Luxury", "plain t-shirt", "nice watch", "mansion"], ["Soft to touch", "Prickly", "bunny", "carpet", "cactus"],
+];
+const EXAMPLE_AT = [12, 50, 88]; // where each card's three examples sit on the dial (0 = left, 100 = right)
+const LEAN = [[0, 10, "totally "], [10, 25, "very "], [25, 42, "kind of "], [58, 75, "kind of "], [75, 90, "very "], [90, 101, "totally "]];
+
+// ── CONNECTION ──────────────────────────────────────────────────────────────────────
+// The builder fills these in for this game. Downloaded from GitHub? Put your own pk_ key here.
+const MP_CONNECT = {
+  key: 'pk_REPLACE_ME',
+  room: 'mind-meld',
+  endpoint: 'wss://live.multiplayeragent.com',
+  apiUrl: 'https://api.multiplayeragent.com',
+};
+const ATTRACT = new URLSearchParams(location.search).has("attract");
+
+/** Same shape as the SDK client, kept in this tab: offline play and ?attract. */
+function localRoom() {
+  const id = "local", state = { entities: { players: { [id]: {} } }, shared: {} }, subs = [];
+  let queued = false;
+  const emit = () => { if (!queued) { queued = true; queueMicrotask(() => { queued = false; subs.forEach((f) => f(state)); }); } };
+  const put = (o, k, v) => { if (typeof k === "object") Object.assign(o, k); else o[k] = v; emit(); };
+  return {
+    sessionId: id, state, offline: true,
+    me: { set: (k, v) => put(state.entities.players[id], k, v) },
+    setShared: (k, v) => put(state.shared, k, v),
+    onState: (f) => { subs.push(f); f(state); }, onJoin() {}, onLeave() {}, on() {}, send() {},
+    onDisconnect() {}, onReconnect() {}, leave: async () => {},
+  };
+}
+async function connect() {
+  if (ATTRACT || typeof MP === "undefined") return localRoom();
+  try {
+    const mp = await Promise.race([MP.join({ ...MP_CONNECT }), new Promise((_, no) => setTimeout(() => no(new Error("timed out")), 10000))]);
+    window.mp = mp; // the builder calls window.mp.leave() when the page closes
+    return mp;
+  } catch (e) {
+    console.warn("Playing offline:", e && e.message);
+    return localRoom();
+  }
+}
+const parse = (v, fb) => { if (typeof v !== "string") return fb; try { return JSON.parse(v); } catch { return fb; } };
+const memo = new Map();
+/** A JSON field, parsed once per change (numeric-looking values come back as numbers, so check the type). */
+function cached(key, raw, fb) {
+  const m = memo.get(key);
+  if (m && m.raw === raw) return m.v;
+  const v = parse(raw, fb);
+  memo.set(key, { raw, v });
+  return v;
+}
+let net = null, S = { entities: { players: {} }, shared: {} };
+const seenHb = new Map(); // sessionId -> { hb, at } on OUR clock
+/** Players whose heartbeat moved in the last 3s (plus us), sorted by sessionId. */
+function livePlayers() {
+  const now = performance.now(), out = [];
+  for (const [id, p] of Object.entries(S.entities.players || {})) {
+    const s = seenHb.get(id);
+    if (!s || s.hb !== p.hb) seenHb.set(id, { hb: p.hb, at: now });
+    if (id === net.sessionId || now - seenHb.get(id).at < 3000) out.push(id);
+  }
+  return out.sort();
+}
+let hostHold = 0, lastTick = performance.now(); // after a freeze, no hosting before hostHold (see frame())
+/** A tab whose loop has stopped doesn't host, nor for 0.7s after it wakes: the newer state lands first. */
+const isHost = () => performance.now() > hostHold && performance.now() - lastTick < 1000 && livePlayers()[0] === net.sessionId;
+const humans = () => livePlayers();
+const stillHere = (id) => id === net.sessionId || (!!S.entities.players?.[id] && performance.now() - (seenHb.get(id)?.at ?? -1e9) < CONFIG.leaveMs);
+const pkOf = (id) => (id === net.sessionId ? Seal.pub : S.entities.players?.[id]?.pk);
+
+// ── SEALED SECRETS ──────────────────────────────────────────────────────────────────
+// Hidden info in a relay room. Everything in room state reaches every client, so a secret
+// (where the target is) is written SEALED: encrypted so only its one reader can open it. Each
+// player publishes a public key in its own entity (`pk`); the host seals the target to the
+// clue-giver's key and writes the box into the shared `secret` field.
+//   - The host deals, so the host knows the target too. Fine for friends, not cheat-proof.
+//   - A new host can't open boxes the old host sealed: the clue-giver re-sends the target to
+//     the new host (sealed, with mp.send). A bot's target lived only in the old host's memory.
+//   - crypto.subtle needs https or localhost. Without it seal()/open() pass the value through.
+//   - NEVER plaintext online: with no key for the recipient, seal() returns "" (an empty box).
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const Seal = {
+  pair: null,
+  pub: "",
+  keys: new Map(), // other player's public key -> derived AES key
+  get on() { return !!(window.crypto && crypto.subtle); },
+  /** Make this player's key pair. Returns the public key to publish: me.set("pk", pub). */
+  async init() {
+    if (!this.on) return "";
+    this.pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveKey"]);
+    this.pub = b64(await crypto.subtle.exportKey("raw", this.pair.publicKey));
+    return this.pub;
+  },
+  async key(otherPub) {
+    let k = this.keys.get(otherPub);
+    if (!k) {
+      const theirs = await crypto.subtle.importKey("raw", unb64(otherPub), { name: "ECDH", namedCurve: "P-256" }, false, []);
+      k = await crypto.subtle.deriveKey({ name: "ECDH", public: theirs }, this.pair.privateKey, { name: "AES-GCM", length: 128 }, false, ["encrypt", "decrypt"]);
+      this.keys.set(otherPub, k);
+    }
+    return k;
+  },
+  /** Seal any JSON value so only the holder of `toPub` (and you) can open it. */
+  async seal(toPub, value) {
+    if (!this.on) return "p:" + JSON.stringify(value);
+    if (!toPub || !this.pair) return ""; // never plaintext: nobody can open an empty box
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await this.key(toPub), new TextEncoder().encode(JSON.stringify(value)));
+    return b64(iv) + "." + b64(ct);
+  },
+  /** Open a box sealed by the player whose public key is `fromPub`. Null if it isn't for you. */
+  async open(fromPub, box) {
+    if (typeof box !== "string") return null;
+    if (box.startsWith("p:")) return JSON.parse(box.slice(2));
+    if (!this.on || !fromPub || !this.pair) return null;
+    try {
+      const [iv, ct] = box.split(".").map(unb64);
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, await this.key(fromPub), ct);
+      return JSON.parse(new TextDecoder().decode(pt));
+    } catch { return null; }
+  },
+};
+
+// ── GAME (HOST) ─────────────────────────────────────────────────────────────────────
+// The host's private memory: the target, its own copy of the dial, and the bots' plan.
+const host = { last: null, was: false, target: null, dial: null, dialAt: 0, plan: null, graceUntil: 0, busy: false, humanAt: 0 };
+let heard = null; // a target the clue-giver re-sent to me, in case I become host: {k, x}
+
+function game() {
+  const g = cached("game", S.shared.game, null);
+  return host.last && isHost() && (!g || host.last.v > g.v) ? host.last : g;
+}
+function writeGame(g) { g = { ...g, v: (game()?.v ?? 0) + 1 }; host.last = g; net.setShared("game", JSON.stringify(g)); return g; }
+const patch = (changes) => writeGame({ ...game(), ...changes });
+const newGame = (id) => ({ id, ph: "lobby", n: 0, deal: 0, seed: (Math.random() * 1e6) | 0, order: [], giver: "", card: 0, at: Date.now(), endsAt: Date.now() + CONFIG.lobbyMs,
+  clue: "", target: -1, final: -1, pts: 0, score: 0, gave: {}, bots: [], locked: [], ready: [] });
+const roundKey = (g) => `${g.id}.${g.n}.${g.deal}`;
+const isBot = (g, id) => !!g && g.bots.some((b) => b.i === id);
+const nameIn = (g, id) => (id === net.sessionId ? myName : g && g.bots.find((b) => b.i === id)?.n) || String(S.entities.players?.[id]?.n ?? "Player").slice(0, 14);
+const colorIn = (g, id) => (id === net.sessionId ? myColor : g && g.bots.find((b) => b.i === id)?.c) || S.entities.players?.[id]?.c || "#999";
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const clamp = (x) => Math.max(0, Math.min(100, x));
+const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.4; // roughly -2…2
+const pointsFor = (d) => { for (const [w, p] of CONFIG.zones) if (Math.abs(d) <= w) return p; return 0; };
+/** Everyone guessing this round: people (not the giver) and bots (not the giver). */
+const guessers = (g) => [...humans().filter((id) => id !== g.giver), ...g.bots.map((b) => b.i).filter((id) => id !== g.giver)];
+const lockedIn = (g, id) => (isBot(g, id) ? g.locked.includes(id) : (id === net.sessionId ? myLock : S.entities.players?.[id]?.lk) === "r" + roundKey(g));
+
+/** The dial as state has it, or the host's own newer write. */
+function dial() {
+  const d = cached("dial", S.shared.dial, null);
+  return host.dial && isHost() && (!d || host.dial.v > d.v) ? host.dial : d;
+}
+function writeDial(k, x, by) {
+  const d = { k, x: Math.round(clamp(x) * 10) / 10, by, v: (dial()?.v ?? 0) + 1 };
+  host.dial = d; host.dialAt = performance.now();
+  net.setShared("dial", JSON.stringify(d));
+}
+const dialX = (g) => { const d = dial(); return d && d.k === roundKey(g) ? d.x : 50; };
+
+/** Become host: carry on from state. The target comes back from the clue-giver, or the round is dealt again. */
+function adopt() {
+  const g0 = cached("game", S.shared.game, null), keep = host.target && g0 && host.target.k === roundKey(g0) ? host.target : null; // a target for this very round is still good
+  Object.assign(host, { was: true, last: null, dial: null, plan: null, target: keep, busy: false, graceUntil: performance.now() + (net.offline ? 0 : CONFIG.graceMs) });
+  const g = game();
+  if (!g || (g.ph !== "clue" && g.ph !== "guess")) return;
+  if (myTarget && myTarget.k === roundKey(g)) host.target = myTarget;
+  else if (heard && heard.k === roundKey(g)) host.target = heard;
+  if (!net.offline) net.send("who", { k: roundKey(g) });
+}
+
+function hostTick() {
+  if (!host.was) adopt();
+  if (host.busy) return; // sealing a new target: wait for it
+  const t = Date.now();
+  let g = game();
+  if (!g) g = writeGame(newGame(1));
+  if (g.ph === "lobby" && t >= g.endsAt) startGame(g, t);
+  else if (g.ph === "clue" || g.ph === "guess") roundTick(g, t);
+  else if (g.ph === "reveal" && t >= g.endsAt) nextRound(g, t);
+  else if (g.ph === "results" && t >= g.endsAt) writeGame(newGame(g.id + 1));
+}
+
+function startGame(g, t) {
+  const hs = humans().filter((id) => pkOf(id) || !Seal.on || net.offline), names = shuffle([...BOT_NAMES]), used = new Set(hs.map((id) => colorIn(g, id)));
+  const free = COLORS.filter((c) => !used.has(c));
+  const bots = Array.from({ length: Math.max(0, CONFIG.seats - hs.length) }, (_, k) => ({ i: "bot" + (k + 1), n: names[k % names.length], c: free[k % free.length] || COLORS[k] }));
+  const order = shuffle([...hs, ...bots.map((b) => b.i)]).slice(0, CONFIG.maxRounds);
+  deal(patch({ order, bots, n: 0, deal: 0, score: 0, gave: {}, ready: [] }), 0, 0);
+}
+
+/** A fresh card and a secret target for round n, sealed to its clue-giver. */
+async function deal(g, n, dealNo) {
+  if (host.busy) return;
+  host.busy = true;
+  try {
+    let giver = g.order[n % g.order.length];
+    if (!isBot(g, giver) && !(pkOf(giver) || !Seal.on || net.offline)) giver = g.bots[0]?.i || giver; // no key yet: never send it in the clear
+    const x = Math.round(rnd(6, 94)), k = `${g.id}.${n}.${dealNo}`;
+    const box = isBot(g, giver) ? "" : await Seal.seal(pkOf(giver), { k, x });
+    if (!isHost() || game()?.id !== g.id) return; // the room moved on while we sealed
+    host.target = { k, x }; host.plan = null;
+    net.setShared("secret", JSON.stringify({ k, pk: Seal.pub, box }));
+    writeDial(k, 50, "");
+    const t = Date.now();
+    patch({ ph: "clue", n, deal: dealNo, giver, card: (g.seed + n * 7 + dealNo * 3) % CARDS.length, at: t, endsAt: t + CONFIG.clueMs, clue: "", target: -1, final: -1, pts: 0, locked: [] });
+  } finally { host.busy = false; }
+}
+
+function roundTick(g, t) {
+  const settled = performance.now() >= host.graceUntil;
+  if (!host.target || host.target.k !== roundKey(g)) { if (settled && !host.busy) deal(g, g.n, g.deal + 1); return; } // the target left with the old host: deal this round again
+  if (g.ph === "clue") {
+    const c = isBot(g, g.giver) ? null : cached("clue:" + g.giver, g.giver === net.sessionId ? myClueRaw : S.entities.players?.[g.giver]?.clue, null);
+    let text = c && c.k === roundKey(g) ? String(c.t || "").trim().slice(0, 30) : "";
+    if (!text && isBot(g, g.giver) && t >= g.at + (host.plan?.clueAt ?? (host.plan = { clueAt: rnd(...CONFIG.botClueAt) }).clueAt)) text = botClue(g);
+    if (!text && (t >= g.endsAt || (!isBot(g, g.giver) && !stillHere(g.giver)))) text = botClue(g); // out of time, or the giver left: write one for them
+    if (text) { host.plan = null; patch({ ph: "guess", clue: text, at: t, endsAt: t + CONFIG.guessMs }); }
+    return;
+  }
+  botsGuess(g, t);
+  g = game();
+  const all = guessers(g);
+  if (all.length && all.every((id) => lockedIn(g, id)) && g.endsAt > t + CONFIG.hurryMs) g = patch({ endsAt: t + CONFIG.hurryMs });
+  if (t >= g.endsAt) reveal(g, t);
+}
+function reveal(g, t) {
+  const x = dialX(g), pts = pointsFor(x - host.target.x);
+  patch({ ph: "reveal", target: host.target.x, final: x, pts, score: g.score + pts, gave: { ...g.gave, [g.giver]: (g.gave[g.giver] || 0) + pts }, at: t, endsAt: t + CONFIG.revealMs });
+}
+function nextRound(g, t) {
+  if (g.n + 1 < g.order.length) deal(g, g.n + 1, 0);
+  else patch({ ph: "results", at: t, endsAt: t + CONFIG.resultsMs, ready: [] });
+}
+
+/** A dial turn from a player (the clue-giver can't turn it). */
+function onTurn(from, d) {
+  const g = game();
+  if (!g || g.ph !== "guess" || from === g.giver || !d || d.k !== roundKey(g) || typeof d.x !== "number") return;
+  host.humanAt = performance.now();
+  if (performance.now() - host.dialAt < CONFIG.dialEveryMs) { host.pending = { x: d.x, by: from }; return; }
+  writeDial(roundKey(g), d.x, from);
+}
+function flushDial(g) {
+  if (host.pending && performance.now() - host.dialAt >= CONFIG.dialEveryMs) { writeDial(roundKey(g), host.pending.x, host.pending.by); host.pending = null; }
+}
+function onReady(from) {
+  const g = game();
+  if (!g || g.ph !== "results" || g.ready.includes(from)) return;
+  const ready = [...g.ready, from];
+  patch({ ready, endsAt: humans().every((id) => ready.includes(id)) ? Math.min(g.endsAt, Date.now() + 1500) : g.endsAt });
+}
+
+// ── BOTS (HOST) ─────────────────────────────────────────────────────────────────────
+/** A bot's clue: the card's example nearest the target if it's close, else "very cold" and the like. */
+function botClue(g) {
+  const card = CARDS[g.card], x = host.target.x;
+  const near = EXAMPLE_AT.map((at, i) => [Math.abs(at - x), i]).sort((a, b) => a[0] - b[0])[0];
+  if (near[0] <= 9) return card[2 + near[1]];
+  const lean = LEAN.find(([a, b]) => x >= a && x < b);
+  return lean ? lean[2] + (x < 50 ? card[0] : card[1]).toLowerCase() : "right in between";
+}
+/** Where a bot thinks the clue points: exact for a bot's own words, a fair guess for a person's. */
+function botReading(g) {
+  const card = CARDS[g.card], i = card.slice(2).indexOf(g.clue);
+  if (i >= 0) return EXAMPLE_AT[i];
+  const lean = LEAN.find(([, , word]) => g.clue === word + card[0].toLowerCase() || g.clue === word + card[1].toLowerCase());
+  if (lean) return (lean[0] + Math.min(100, lean[1])) / 2;
+  if (g.clue === "right in between") return 50;
+  return null; // a person's clue: bots can't read words, so they lean on a hunch near the truth
+}
+/** Bots take turns nudging the dial toward their own guess; they back off while a person drags it. */
+function botsGuess(g, t) {
+  flushDial(g);
+  const bots = g.bots.filter((b) => b.i !== g.giver);
+  if (!bots.length) return;
+  if (!host.plan || host.plan.k !== roundKey(g)) {
+    const read = botReading(g);
+    host.plan = { k: roundKey(g), next: t + rnd(800, 1500), goal: new Map(bots.map((b) => [b.i, clamp((read ?? host.target.x) + gauss() * (read == null ? CONFIG.botBlind : CONFIG.botSpread))])) };
+  }
+  const people = guessers(g).filter((id) => !isBot(g, id));
+  if (people.some((id) => lockedIn(g, id))) { // a person locked in: the bots go along with the team
+    const next = bots.find((b) => !g.locked.includes(b.i));
+    if (next && t >= host.plan.next) { host.plan.next = t + rnd(400, 1200); patch({ locked: [...g.locked, next.i] }); }
+    return;
+  }
+  if (t < host.plan.next || performance.now() - host.humanAt < 1500) return;
+  host.plan.next = t + rnd(...CONFIG.botNudgeMs);
+  const x = dialX(g), mood = bots.filter((b) => !g.locked.includes(b.i)), b = pick(mood.length ? mood : bots), goal = host.plan.goal.get(b.i);
+  if (Math.abs(goal - x) > 3) { writeDial(roundKey(g), x + Math.sign(goal - x) * Math.min(CONFIG.botStep, Math.abs(goal - x)) * rnd(0.6, 1), b.i); return; }
+  const near = bots.filter((o) => !g.locked.includes(o.i) && Math.abs(host.plan.goal.get(o.i) - x) < 12); // close enough for them: lock in
+  if (near.length) patch({ locked: [...g.locked, near[0].i] });
+}
+
+// ── ME ──────────────────────────────────────────────────────────────────────────────
+let myName = "", myColor = COLORS[0], myTarget = null, myClueRaw = "", myLock = "", opening = false;
+try { myName = localStorage.getItem("mpa-name") || ""; } catch {}
+if (!myName) myName = pick(FRIENDLY) + " " + (10 + Math.floor(Math.random() * 90));
+const drag = { on: false, x: 50, at: -1e9, sent: 0, k: "" };
+
+/** My round as clue-giver: open the sealed target. */
+function myTick(g) {
+  const sec = cached("secret", S.shared.secret, null);
+  if ((g.ph === "clue" || g.ph === "guess") && g.giver === net.sessionId && sec && sec.k === roundKey(g) && myTarget?.k !== sec.k && !opening) {
+    opening = true;
+    Seal.open(sec.pk, sec.box).then((v) => { if (v && v.k === sec.k) myTarget = v; }).finally(() => { opening = false; });
+  }
+}
+function giveClue(text) {
+  const g = game();
+  text = String(text || "").replace(/\s+/g, " ").trim().slice(0, 30);
+  if (!g || g.ph !== "clue" || g.giver !== net.sessionId || !text) return;
+  myClueRaw = JSON.stringify({ k: roundKey(g), t: text });
+  net.me.set("clue", myClueRaw);
+  tone(660, 90); setTimeout(() => tone(990, 140), 90);
+}
+const canTurn = (g) => !!g && g.ph === "guess" && g.giver !== net.sessionId;
+function turnTo(x) {
+  const g = game();
+  if (!canTurn(g)) return;
+  drag.x = clamp(x); drag.at = performance.now(); drag.k = roundKey(g);
+  if (performance.now() - drag.sent < CONFIG.turnEveryMs) return;
+  sendTurn(g);
+}
+function sendTurn(g) {
+  drag.sent = performance.now();
+  const d = { k: roundKey(g), x: Math.round(drag.x * 10) / 10 };
+  if (isHost()) onTurn(net.sessionId, d); else net.send("turn", d);
+}
+function toggleLock() {
+  const g = game();
+  if (!canTurn(g)) return;
+  myLock = myLock === "r" + roundKey(g) ? "" : "r" + roundKey(g);
+  net.me.set("lk", myLock || "-");
+  tone(myLock ? 740 : 440, 110);
+}
+/** When the host changes, the clue-giver hands the target to the new one, sealed. */
+let lastHost = "";
+function watchHost() {
+  const h = livePlayers()[0];
+  if (h === lastHost) return;
+  lastHost = h;
+  if (h && h !== net.sessionId) resendTarget(h);
+}
+async function resendTarget(to) {
+  const g = game(), pk = pkOf(to);
+  if (g && g.giver === net.sessionId && myTarget?.k === roundKey(g) && pk && !net.offline) net.send("secret", { to, box: await Seal.seal(pk, myTarget) });
+}
+
+// ── SCREEN ──────────────────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const setHtml = (el, html) => { if (el.dataset.v !== html) { el.dataset.v = html; el.innerHTML = html; } };
+const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
+const cv = $("dial"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function fit() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  W = $("dialWrap").clientWidth; H = $("dialWrap").clientHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+}
+addEventListener("resize", fit); addEventListener("orientationchange", fit);
+/** The dial's center and radius in CSS pixels. */
+function geo() { const R = Math.max(40, Math.min(W * 0.45, H - 46)); return { cx: W / 2, cy: (H + R) / 2 - 16, R }; }
+const angleOf = (x) => Math.PI + (clamp(x) / 100) * Math.PI;
+function xAt(px, py) {
+  const { cx, cy } = geo(), a = Math.atan2(py - cy, px - cx);
+  if (a > 0) return a < Math.PI / 2 ? 100 : 0; // below the dial: the nearest end
+  return ((a + Math.PI) / Math.PI) * 100;
+}
+
+let shown = 50; // the needle as drawn: eases toward the dial in state
+const sparks = [];
+function burst(x, y, n, colors) { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), s = rnd(80, 380); sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 120, life: 1, c: pick(colors) }); } }
+function draw(g, dt, now) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
+  if (!g) return;
+  const { cx, cy, R } = geo(), card = CARDS[g.card] || CARDS[0];
+  // where the needle is: my own drag right away, everyone else's eased
+  const mineFresh = drag.k === roundKey(g) && performance.now() - drag.at < 400;
+  const want = g.ph === "reveal" || g.ph === "results" ? (g.final >= 0 ? g.final : dialX(g)) : mineFresh ? drag.x : dialX(g);
+  shown += (want - shown) * (mineFresh ? 1 : 1 - Math.exp(-dt * 14));
+  // the face: a gradient from one side to the other
+  const grad = ctx.createLinearGradient(cx - R, 0, cx + R, 0);
+  grad.addColorStop(0, "#2f6fe0"); grad.addColorStop(0.5, "#5b4bb8"); grad.addColorStop(1, "#e8663a");
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+  ctx.lineWidth = 6; ctx.strokeStyle = "#ffffff30"; ctx.stroke();
+  for (let i = 0; i <= 20; i++) { const a = angleOf(i * 5); ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.93, cy + Math.sin(a) * R * 0.93); ctx.lineTo(cx + Math.cos(a) * R * (i % 5 ? 0.97 : 1), cy + Math.sin(a) * R * (i % 5 ? 0.97 : 1)); ctx.strokeStyle = "#ffffff55"; ctx.lineWidth = i % 5 ? 1.5 : 3; ctx.stroke(); }
+  // the target wedge: the clue-giver sees it all round; everyone sees it at the reveal (it sweeps open)
+  let target = -1, open = 1;
+  if (g.ph === "reveal" || g.ph === "results") { target = g.target; open = g.ph === "reveal" ? Math.min(1, Math.max(0, (Date.now() - g.at - 400) / 700)) : 1; }
+  else if (g.giver === net.sessionId && myTarget?.k === roundKey(g)) target = myTarget.x;
+  if (target >= 0 && open > 0) drawWedge(cx, cy, R, target, open);
+  // the needle
+  const a = angleOf(shown), len = R * 0.9;
+  ctx.lineCap = "round"; ctx.strokeStyle = "#00000055"; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(cx + 3, cy + 4); ctx.lineTo(cx + 3 + Math.cos(a) * len, cy + 4 + Math.sin(a) * len); ctx.stroke();
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len); ctx.stroke();
+  ctx.fillStyle = "#ffd166"; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * len, cy + Math.sin(a) * len, canTurn(g) ? 15 : 10, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill();
+  // who turned it last
+  const d = dial();
+  if (g.ph === "guess" && d && d.k === roundKey(g) && d.by && !mineFresh) {
+    ctx.font = "800 13px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = colorIn(g, d.by);
+    ctx.fillText(nameIn(g, d.by), cx + Math.cos(a) * (len + 26), cy + Math.sin(a) * (len + 26));
+  }
+  // the two ends of the spectrum
+  ctx.font = `900 ${Math.max(15, Math.min(24, W / 24))}px system-ui, sans-serif`; ctx.textBaseline = "top";
+  ctx.textAlign = "left"; ctx.fillStyle = "#8fb8ff"; ctx.fillText("◀ " + card[0], Math.max(4, cx - R - 6), cy + 12);
+  ctx.textAlign = "right"; ctx.fillStyle = "#ffab85"; ctx.fillText(card[1] + " ▶", Math.min(W - 4, cx + R + 6), cy + 12);
+  ctx.textBaseline = "alphabetic";
+  // sparks
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i]; p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.1;
+    if (p.life <= 0) { sparks.splice(i, 1); continue; }
+    ctx.globalAlpha = Math.min(1, p.life * 2); ctx.fillStyle = p.c; ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
+  }
+  ctx.globalAlpha = 1;
+}
+/** The scoring zones around the target: 2, 3, 4, 3, 2 points. */
+function drawWedge(cx, cy, R, t, open) {
+  const fills = ["#ffe08a", "#ffb84d", "#ff6b6b"];
+  CONFIG.zones.slice().reverse().forEach(([w, p], i) => {
+    const a0 = angleOf(t - w * open), a1 = angleOf(t + w * open);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R * 0.98, a0, a1); ctx.closePath(); ctx.fillStyle = fills[i]; ctx.fill();
+    if (open >= 1) {
+      ctx.font = "900 15px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#3a1f10";
+      const inner = CONFIG.zones[CONFIG.zones.length - 2 - i]?.[0] ?? 0, mid = (w + inner) / 2, r = R * 0.82;
+      for (const s of inner ? [-1, 1] : [0]) { const x = t + s * mid; if (x < 0 || x > 100) continue; const a = angleOf(x); ctx.fillText(String(p), cx + Math.cos(a) * r, cy + Math.sin(a) * r + 5); }
+    }
+  });
+}
+
+let dropped = false; // true while the connection is down: the HUD keeps showing "Reconnecting…"
+function render(g) {
+  const n = humans().length;
+  setText($("net"), ATTRACT ? "" : net.offline ? "Offline: playing with bots" : dropped ? "Reconnecting…" : `Online · ${n} player${n === 1 ? "" : "s"}${isHost() ? " · you run the game" : ""}`);
+  if (!g) return;
+  const t = Date.now(), left = Math.max(0, g.endsAt - t), span = { lobby: CONFIG.lobbyMs, clue: CONFIG.clueMs, guess: CONFIG.guessMs, reveal: CONFIG.revealMs, results: CONFIG.resultsMs }[g.ph] || 1;
+  $("bar").firstElementChild.style.transform = `scaleX(${Math.min(1, left / span).toFixed(3)})`;
+  const inGame = g.ph !== "lobby";
+  setText($("rn"), inGame && g.ph !== "results" ? `Round ${g.n + 1} of ${g.order.length}` : "");
+  setText($("score"), inGame ? `Team ${g.score}` : "");
+  $("name").hidden = ATTRACT || g.ph !== "lobby";
+  $("how").hidden = g.ph !== "lobby";
+  const giver = nameIn(g, g.giver), meGive = g.giver === net.sessionId;
+  let clue = "";
+  if (g.ph === "lobby") clue = `<small>Mind Meld</small><b class="wait">Next game in ${Math.ceil(left / 1000)}…</b>`;
+  else if (g.ph === "clue") clue = meGive ? `<small>You're the clue-giver</small><b class="wait">${myTarget?.k === roundKey(g) ? "Give a clue for the red zone" : "Opening your target…"}</b>` : `<small>${esc(giver)} is the clue-giver</small><b class="wait">Thinking of a clue…</b>`;
+  else if (g.ph === "results") clue = "<small>Game over</small><b>Team " + g.score + "</b>";
+  else clue = `<small>${esc(giver)}'s clue</small><b>“${esc(g.clue)}”</b>`;
+  setHtml($("clue"), clue);
+  // the action row
+  const giving = g.ph === "clue" && meGive;
+  $("clueIn").hidden = !giving;
+  $("go").hidden = !(giving || canTurn(g));
+  const locked = myLock === "r" + roundKey(g);
+  setText($("go"), giving ? "Give clue" : locked ? "Locked ✓" : "Lock in");
+  $("go").classList.toggle("done", !giving && locked);
+  let hint = "";
+  if (g.ph === "clue" && meGive) hint = `${Math.ceil(left / 1000)}s · a word or two that points at the red zone`;
+  else if (g.ph === "clue") hint = `Get ready to turn the dial · ${Math.ceil(left / 1000)}s`;
+  else if (g.ph === "guess") hint = meGive ? `Watch your team turn the dial… ${Math.ceil(left / 1000)}s` : `Drag the dial together. Lock in when you agree · ${Math.ceil(left / 1000)}s`;
+  else if (g.ph === "reveal") hint = g.pts === 4 ? "BULLSEYE! +4" : g.pts ? `Close! +${g.pts}` : "Missed it. Next round!";
+  setText($("hint"), hint);
+  // the team
+  const ids = [...new Set([...g.order, ...humans()])].filter((id) => isBot(g, id) || humans().includes(id));
+  setHtml($("players"), ids.map((id) => `<div class="p ${id === net.sessionId ? "me" : ""} ${id === g.giver && g.ph !== "lobby" ? "giver" : ""} ${g.ph === "guess" && lockedIn(g, id) ? "in" : ""}"><span class="av" style="background:${esc(colorIn(g, id))}">${id === g.giver && g.ph !== "lobby" && g.ph !== "results" ? "🎯" : esc(nameIn(g, id)[0] || "?")}</span>${esc(nameIn(g, id))}${g.gave[id] ? ` · ${g.gave[id]}` : ""}</div>`).join(""));
+  renderOver(g);
+}
+
+let boardFor = -1, lb = null;
+function renderOver(g) {
+  $("over").hidden = g.ph !== "results";
+  if (g.ph !== "results") return;
+  const max = g.order.length * CONFIG.zones[0][1], best = Object.entries(g.gave).sort((a, b) => b[1] - a[1])[0];
+  setText($("oTitle"), g.score >= max * 0.75 ? "Total mind meld!" : g.score >= max * 0.45 ? "Nicely in sync!" : "Some wires crossed…");
+  setText($("oSub"), `Team score ${g.score} of ${max}${best && best[1] ? ` · best clues: ${nameIn(g, best[0])}` : ""}`);
+  setHtml($("ranks"), g.order.map((id) => ({ id, s: g.gave[id] || 0 })).sort((a, b) => b.s - a.s).map((r) => `<li style="${r.id === net.sessionId ? "font-weight:800" : ""}">${esc(nameIn(g, r.id))}'s clue<span>+${r.s}</span></li>`).join(""));
+  setText($("oNext"), `Next game in ${Math.max(0, Math.ceil((g.endsAt - Date.now()) / 1000))}s`);
+  setText($("again"), g.ready.includes(net.sessionId) ? "Ready ✓" : "Play again");
+  if (boardFor === g.id) return;
+  boardFor = g.id;
+  const list = $("board10");
+  if (!lb) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
+  list.innerHTML = "<li>Loading…</li>";
+  (g.score > 0 ? lb.submit(g.score).catch(() => null) : Promise.resolve()).then(() => lb.top(10)).then(({ entries }) => {
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score}</span></li>`).join("") : "<li>No scores yet.</li>";
+  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+}
+
+let AC = null;
+function unlockAudio() { if (!AC && !ATTRACT) try { AC = new AudioContext(); } catch {} }
+function tone(f, ms, type = "sine", vol = 0.05) {
+  if (!AC) return;
+  const o = AC.createOscillator(), gn = AC.createGain(), t = AC.currentTime;
+  o.type = type; o.frequency.value = f; gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+  o.connect(gn).connect(AC.destination); o.start(t); o.stop(t + ms / 1000);
+}
+/** Effects for what just changed in state: nothing here decides anything. */
+const seen = { key: "", ph: "", burst: "" };
+function effects(g) {
+  const key = roundKey(g);
+  if (g.ph === "reveal" && seen.burst !== key && Date.now() - g.at > 1100) {
+    seen.burst = key;
+    const { cx, cy, R } = geo(), a = angleOf(g.target);
+    if (g.pts) burst(cx + Math.cos(a) * R * 0.8, cy + Math.sin(a) * R * 0.8, g.pts * 18, ["#ffd166", "#ff6b6b", "#3ddc97", "#fff"]);
+    if (g.pts === 4) { tone(784, 120); setTimeout(() => tone(1047, 140), 110); setTimeout(() => tone(1568, 260), 230); }
+    else if (g.pts) { tone(660, 120); setTimeout(() => tone(880, 200), 110); } else tone(196, 300, "triangle");
+  }
+  if (g.ph === "guess" && seen.ph === "clue") tone(520, 120);
+  if (seen.key !== key) { seen.key = key; myLock = ""; if (!ATTRACT) $("clueIn").value = ""; }
+  seen.ph = g.ph;
+}
+
+/** Two players picked one color (they joined at once): the later sessionId picks another. Bots' colors count as taken. */
+function fixColor() {
+  const ps = S.entities.players || {}, botColors = (game()?.bots || []).map((b) => b.c);
+  if (!Object.entries(ps).some(([id, p]) => id < net.sessionId && p.c === myColor) && !botColors.includes(myColor)) return;
+  const taken = new Set([...Object.entries(ps).filter(([id]) => id !== net.sessionId).map(([, p]) => p.c), ...botColors]);
+  myColor = COLORS.find((c) => !taken.has(c)) || pick(COLORS);
+  net.me.set("c", myColor);
+}
+
+// ── INPUT ───────────────────────────────────────────────────────────────────────────
+const local = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+cv.addEventListener("pointerdown", (e) => {
+  unlockAudio();
+  if (!canTurn(game())) return;
+  e.preventDefault(); cv.setPointerCapture(e.pointerId);
+  drag.on = true; turnTo(xAt(...local(e)));
+});
+cv.addEventListener("pointermove", (e) => { if (drag.on) turnTo(xAt(...local(e))); });
+for (const ev of ["pointerup", "pointercancel"]) cv.addEventListener(ev, () => { if (drag.on) { drag.on = false; const g = game(); if (canTurn(g)) sendTurn(g); } });
+addEventListener("keydown", (e) => {
+  const g = game();
+  if (document.activeElement.tagName === "INPUT" || !canTurn(g)) return;
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); turnTo((drag.k === roundKey(g) && performance.now() - drag.at < 400 ? drag.x : dialX(g)) + (e.key === "ArrowLeft" ? -2 : 2)); }
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleLock(); }
+});
+$("act").addEventListener("submit", (e) => {
+  e.preventDefault(); unlockAudio();
+  const g = game();
+  if (g && g.ph === "clue" && g.giver === net.sessionId) giveClue($("clueIn").value); else toggleLock();
+});
+$("again").addEventListener("click", () => { unlockAudio(); if (isHost()) onReady(net.sessionId); else net.send("ready", { r: 1 }); });
+$("name").addEventListener("change", () => {
+  myName = $("name").value.trim().slice(0, 14) || myName;
+  try { localStorage.setItem("mpa-name", myName); } catch {}
+  net && net.me.set("n", myName);
+});
+
+// ── MAIN LOOP ───────────────────────────────────────────────────────────────────────
+/** ?attract: my player gives clues and turns the dial like a person, so the preview shows the whole loop. */
+const auto = { key: "", goal: 50, typed: 0, nextAt: 0, text: "" };
+function autopilot(g) {
+  if (!ATTRACT || !g) return;
+  const now = performance.now(), key = roundKey(g) + g.ph;
+  if (auto.key !== key) { auto.key = key; auto.typed = 0; auto.nextAt = now + 500; auto.goal = clamp((host.target?.x ?? 50) + gauss() * 6); auto.text = g.ph === "clue" && host.target ? botClue(g) : ""; }
+  if (now < auto.nextAt) return;
+  if (g.ph === "clue" && g.giver === net.sessionId) {
+    if (auto.typed < auto.text.length) { auto.typed++; $("clueIn").value = auto.text.slice(0, auto.typed); auto.nextAt = now + 50; } else giveClue(auto.text);
+  }
+  if (g.ph === "guess" && canTurn(g) && myLock !== "r" + roundKey(g)) {
+    const x = drag.k === roundKey(g) ? drag.x : dialX(g), d = auto.goal - x;
+    if (Math.abs(d) > 1.5) turnTo(x + Math.sign(d) * Math.min(Math.abs(d), 1.6));
+    else if (now > auto.nextAt + 900) toggleLock();
+  }
+}
+
+let last = performance.now(), lastHb = 0, lastRender = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (performance.now() - lastTick > 1000) { hostHold = performance.now() + 700; host.was = false; } // the tab was frozen or in the background: someone else may have hosted meanwhile, so let its state arrive, then adopt it
+  lastTick = performance.now(); // not the rAF time: after a long freeze Chrome can stamp the first frame from before it ended
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+  if (now - lastHb > 1000) { lastHb = now; net.me.set("hb", Date.now()); fixColor(); }
+  watchHost();
+  if (isHost()) hostTick(); else host.was = false;
+  const g = game();
+  if (g) { myTick(g); autopilot(g); effects(g); }
+  if (W !== $("dialWrap").clientWidth || H !== $("dialWrap").clientHeight) fit();
+  draw(g, dt, now);
+  if (now - lastRender > 90) { lastRender = now; render(g); }
+}
+
+(async function start() {
+  if (ATTRACT) Object.assign(CONFIG, { seats: 5, lobbyMs: 300, clueMs: 3000, guessMs: 5000, hurryMs: 300, revealMs: 2600, resultsMs: 4000, botClueAt: [500, 900], botNudgeMs: [160, 320], botStep: 9 });
+  fit();
+  net = await connect();
+  net.onState((st) => { S = st; });
+  net.onDisconnect(() => { dropped = true; $("net").textContent = "Reconnecting…"; });
+  net.onReconnect(() => { dropped = false; });
+  net.on("turn", (msg, from) => { if (isHost()) onTurn(from, msg); });
+  net.on("ready", (msg, from) => { if (isHost()) onReady(from); });
+  net.on("secret", async (msg, from) => { // the clue-giver's target, re-sent to a new host
+    if (!msg || msg.to !== net.sessionId) return;
+    const v = await Seal.open(pkOf(from), msg.box);
+    if (!v) return;
+    heard = v;
+    const g = game();
+    if (isHost() && g && g.giver === from && v.k === roundKey(g) && !host.target) host.target = v;
+  });
+  net.on("who", (msg, from) => resendTarget(from));
+  if (!net.offline && typeof MP !== "undefined") lb = MP.auth({ key: MP_CONNECT.key, apiUrl: MP_CONNECT.apiUrl }).leaderboard(CONFIG.board);
+  const pk = await Seal.init().catch(() => "");
+  const taken = new Set([...Object.entries(S.entities.players || {}).filter(([id]) => id !== net.sessionId).map(([, p]) => p.c), ...(game()?.bots || []).map((b) => b.c)]);
+  myColor = COLORS.find((c) => !taken.has(c)) || pick(COLORS);
+  $("name").value = myName;
+  net.me.set({ n: myName, c: myColor, hb: Date.now(), pk });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

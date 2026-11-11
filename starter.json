@@ -1,0 +1,22 @@
+{
+  "name": "Mind Meld",
+  "genre": "word",
+  "dim": "2D",
+  "mode": "Party",
+  "players": "2–10",
+  "hook": "One clue. One dial. How in sync is your team?",
+  "how": "Each round one player secretly sees a target on a dial between two opposites, like cold and hot, and gives a short clue. The team turns the dial together and locks in: the closer to the target, the more team points.",
+  "controls": "Drag the dial (or arrow keys), Lock in with the button or Enter; the clue-giver types a clue",
+  "uses": [
+    ["Hidden info", "The target is sealed so only the clue-giver can read it (the host deals, so it can too)."],
+    ["Host-run rounds", "The host's browser deals the cards, runs the timers and scores each round; if it leaves, the next player takes over."],
+    ["Live sync", "Everyone turns one shared dial and sees it move."],
+    ["Bots", "Bots give clues and turn the dial until enough people join."],
+    ["Leaderboard", "The team's best total in one game."]
+  ],
+  "ideas": [
+    "Add a card pack about food",
+    "Let the other team guess left or right for a bonus point",
+    "Make a bullseye shower the screen with confetti"
+  ]
+}
