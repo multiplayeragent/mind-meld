@@ -45,7 +45,7 @@
   #net { font-size: 12px; color: var(--dim); text-align: center; }
   #over { position: fixed; inset: 0; display: grid; place-items: center; background: #0b0920b0; padding: 16px; z-index: 4; }
   .card { width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box; background: var(--card); color: #1b1640; border-radius: 20px; padding: 18px; text-align: center; box-shadow: 0 20px 60px #0008; }
-  .card h2 { margin: 0 0 4px; font-size: 26px; } .card ol { text-align: left; padding-left: 26px; margin: 8px 0; font-size: 14px; } .card li span { float: right; }
+  .card h2 { margin: 0 0 4px; font-size: 26px; } .card ol { text-align: left; padding-left: 26px; margin: 8px 0; font-size: 14px; } .card li span { float: right; } .card li.msg { list-style: none; margin-left: -26px; color: #6d6790; } /* a status line, not a numbered entry */
   .card h3 { margin: 10px 0 0; font-size: 12px; color: #6d6790; text-transform: uppercase; letter-spacing: .08em; }
   #oSub, #oNext { color: #6d6790; font-size: 14px; font-weight: 700; }
   @media (max-width: 560px) { header h1 { font-size: 18px; } #name { width: 96px; } #rn { display: none; } #score { margin-left: auto; } button.go { min-width: 96px; padding: 0 14px; } }
@@ -71,7 +71,7 @@
 </div>
 <div id="over" hidden><div class="card">
   <h2 id="oTitle"></h2><div id="oSub"></div><ol id="ranks"></ol>
-  <h3>Best team scores</h3><ol id="board10"><li>Loading the leaderboard…</li></ol>
+  <h3>Best team scores</h3><ol id="board10"><li class="msg">Loading the leaderboard…</li></ol>
   <button class="go" id="again">Play again</button><div id="oNext"></div>
 </div></div>
 <script>
@@ -130,6 +130,7 @@ const CONFIG = {
   botStep: 7,             // the most a bot turns the dial in one go
   botSpread: 7,           // how far a bot's guess strays when it understands the clue
   botBlind: 15,           // …and when it doesn't (a person's clue)
+  botGive: 0.2,           // each time one bot turns the dial, the others move their guess this much toward it
   board: "meld-points",   // leaderboard name
 };
 const BOT_NAMES = ["Psy", "Hunch", "Vibes", "Echo", "Glimmer", "Nova", "Mystic", "Ponder", "Zen", "Oracle"];
@@ -447,7 +448,7 @@ function botClue(g) {
 function botReading(g) {
   const card = CARDS[g.card], i = card.slice(2).indexOf(g.clue);
   if (i >= 0) return EXAMPLE_AT[i];
-  const lean = LEAN.find(([, , word]) => g.clue === word + card[0].toLowerCase() || g.clue === word + card[1].toLowerCase());
+  const lean = LEAN.find(([a, , word]) => g.clue === word + (a < 50 ? card[0] : card[1]).toLowerCase()); // "kind of hot" is the hot side, not the cold one
   if (lean) return (lean[0] + Math.min(100, lean[1])) / 2;
   if (g.clue === "right in between") return 50;
   return null; // a person's clue: bots can't read words, so they lean on a hunch near the truth
@@ -469,8 +470,14 @@ function botsGuess(g, t) {
   }
   if (t < host.plan.next || performance.now() - host.humanAt < 1500) return;
   host.plan.next = t + rnd(...CONFIG.botNudgeMs);
-  const x = dialX(g), mood = bots.filter((b) => !g.locked.includes(b.i)), b = pick(mood.length ? mood : bots), goal = host.plan.goal.get(b.i);
-  if (Math.abs(goal - x) > 3) { writeDial(roundKey(g), x + Math.sign(goal - x) * Math.min(CONFIG.botStep, Math.abs(goal - x)) * rnd(0.6, 1), b.i); return; }
+  const x = dialX(g), mood = bots.filter((b) => !g.locked.includes(b.i));
+  if (!mood.length) return; // a bot that locked in leaves the dial alone
+  const b = pick(mood), goal = host.plan.goal.get(b.i);
+  if (Math.abs(goal - x) > 3) {
+    writeDial(roundKey(g), x + Math.sign(goal - x) * Math.min(CONFIG.botStep, Math.abs(goal - x)) * rnd(0.6, 1), b.i);
+    for (const [id, gl] of host.plan.goal) if (id !== b.i) host.plan.goal.set(id, gl + (x - gl) * CONFIG.botGive); // the others meet it partway, like a team talking it over
+    return;
+  }
   const near = bots.filter((o) => !g.locked.includes(o.i) && Math.abs(host.plan.goal.get(o.i) - x) < 12); // close enough for them: lock in
   if (near.length) patch({ locked: [...g.locked, near[0].i] });
 }
@@ -664,11 +671,11 @@ function renderOver(g) {
   if (boardFor === g.id) return;
   boardFor = g.id;
   const list = $("board10");
-  if (!lb) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
-  list.innerHTML = "<li>Loading…</li>";
+  if (!lb) { list.innerHTML = '<li class="msg">Leaderboards need a connection.</li>'; return; }
+  list.innerHTML = '<li class="msg">Loading…</li>';
   (g.score > 0 ? lb.submit(g.score).catch(() => null) : Promise.resolve()).then(() => lb.top(10)).then(({ entries }) => {
-    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score}</span></li>`).join("") : "<li>No scores yet.</li>";
-  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score}</span></li>`).join("") : '<li class="msg">No scores yet.</li>';
+  }).catch(() => { list.innerHTML = `<li class="msg">Couldn't load the leaderboard.</li>`; });
 }
 
 let AC = null;
@@ -712,6 +719,7 @@ cv.addEventListener("pointerdown", (e) => {
   e.preventDefault(); cv.setPointerCapture(e.pointerId);
   drag.on = true; turnTo(xAt(...local(e)));
 });
+cv.addEventListener("contextmenu", (e) => e.preventDefault()); // a right-click on the dial is not a menu
 cv.addEventListener("pointermove", (e) => { if (drag.on) turnTo(xAt(...local(e))); });
 for (const ev of ["pointerup", "pointercancel"]) cv.addEventListener(ev, () => { if (drag.on) { drag.on = false; const g = game(); if (canTurn(g)) sendTurn(g); } });
 addEventListener("keydown", (e) => {
